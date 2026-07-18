@@ -1,68 +1,117 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Binary Signals</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Binary Signals PRO+</title>
 
 <style>
 body {
-    background: #0f172a;
+    background: #020617;
     color: white;
     font-family: Arial;
     text-align: center;
 }
+h1 { margin-top: 10px; }
+
 table {
     margin: auto;
-    width: 80%;
+    width: 95%;
     border-collapse: collapse;
 }
 td, th {
-    padding: 15px;
+    padding: 10px;
     border: 1px solid #333;
+    font-size: 14px;
 }
-.buy { color: lime; }
-.sell { color: red; }
+
+.buy { color: #00ff99; font-weight: bold; }
+.sell { color: #ff4d4d; font-weight: bold; }
 .wait { color: orange; }
+
+strong { color: gold; }
+
+.card {
+    background: #0f172a;
+    padding: 10px;
+    margin: 10px;
+    border-radius: 10px;
+}
 </style>
 
 </head>
 <body>
 
-<h1>📊 Binary Signal Dashboard</h1>
+<h1>🚀 Binary Signals PRO+</h1>
+<p>Live • Multi-Strategy • Auto Refresh (60s)</p>
 
+<div class="card">
 <table>
 <tr>
 <th>Pair</th>
 <th>Trend</th>
-<th>Signal</th>
-<th>Confidence</th>
+<th>1m</th>
+<th>2m</th>
+<th>5m</th>
+<th>Strength</th>
 </tr>
 
 <tr>
 <td>EUR/USD</td>
-<td id="trend1">...</td>
-<td id="signal1">...</td>
-<td id="conf1">...</td>
+<td id="trend1"></td>
+<td id="s1_1"></td>
+<td id="s2_1"></td>
+<td id="s5_1"></td>
+<td id="power1"></td>
 </tr>
 
 <tr>
 <td>GBP/USD</td>
-<td id="trend2">...</td>
-<td id="signal2">...</td>
-<td id="conf2">...</td>
+<td id="trend2"></td>
+<td id="s1_2"></td>
+<td id="s2_2"></td>
+<td id="s5_2"></td>
+<td id="power2"></td>
 </tr>
 
 <tr>
 <td>USD/JPY</td>
-<td id="trend3">...</td>
-<td id="signal3">...</td>
-<td id="conf3">...</td>
+<td id="trend3"></td>
+<td id="s1_3"></td>
+<td id="s2_3"></td>
+<td id="s5_3"></td>
+<td id="power3"></td>
 </tr>
 
 </table>
+</div>
+
+<audio id="alertSound" src="https://www.soundjay.com/buttons/sounds/button-3.mp3"></audio>
 
 <script>
 
 const API_KEY = "1ce295bfaf354ce18bdf8d6059237cf9";
+
+// EMA
+function ema(period, data) {
+    let k = 2/(period+1);
+    let arr = [data[0]];
+    for (let i=1;i<data.length;i++) {
+        arr.push(data[i]*k + arr[i-1]*(1-k));
+    }
+    return arr;
+}
+
+// RSI
+function rsi(data, period=14) {
+    let gains=0, losses=0;
+    for (let i=data.length-period;i<data.length;i++) {
+        let diff = data[i]-data[i-1];
+        if (diff>0) gains+=diff;
+        else losses-=diff;
+    }
+    let rs = gains / (losses || 1);
+    return 100 - (100/(1+rs));
+}
 
 async function getSignal(pair, row) {
 
@@ -71,64 +120,94 @@ async function getSignal(pair, row) {
     let data = await res.json();
 
     let values = data.values.reverse();
-
     let closes = values.map(v => parseFloat(v.close));
-
-    // EMA
-    function ema(period, data) {
-        let k = 2 / (period + 1);
-        let emaArray = [data[0]];
-        for (let i = 1; i < data.length; i++) {
-            emaArray.push(data[i] * k + emaArray[i-1] * (1 - k));
-        }
-        return emaArray;
-    }
 
     let ema50 = ema(50, closes);
     let ema200 = ema(200, closes);
-
-    // RSI
-    function rsi(data, period = 14) {
-        let gains = [], losses = [];
-        for (let i = 1; i < data.length; i++) {
-            let diff = data[i] - data[i-1];
-            gains.push(diff > 0 ? diff : 0);
-            losses.push(diff < 0 ? -diff : 0);
-        }
-        let avgGain = gains.slice(-period).reduce((a,b)=>a+b)/period;
-        let avgLoss = losses.slice(-period).reduce((a,b)=>a+b)/period;
-        let rs = avgGain / avgLoss;
-        return 100 - (100 / (1 + rs));
-    }
-
-    let last = values[values.length - 1];
     let lastRSI = rsi(closes);
 
     let trend = ema50.at(-1) > ema200.at(-1) ? "UP" : "DOWN";
 
-    let bullish = parseFloat(last.close) > parseFloat(last.open);
-    let bearish = parseFloat(last.close) < parseFloat(last.open);
+    let last = values.at(-1);
+    let prev = values.at(-2);
+
+    let bullish = last.close > last.open;
+    let bearish = last.close < last.open;
 
     let signal = "WAIT";
-    let confidence = 40;
+    let strength = 0;
 
-    if (trend === "UP" && lastRSI < 40 && bullish) {
-        signal = "BUY";
-        confidence = 70;
-    } else if (trend === "DOWN" && lastRSI > 60 && bearish) {
-        signal = "SELL";
-        confidence = 70;
+    // 🔥 STRATEGY 1: TREND PULLBACK
+    if (trend === "UP" && lastRSI < 45 && bullish) {
+        signal = "BUY"; strength += 30;
+    }
+    if (trend === "DOWN" && lastRSI > 55 && bearish) {
+        signal = "SELL"; strength += 30;
     }
 
-    document.getElementById("trend"+row).innerText = trend;
-    document.getElementById("signal"+row).innerText = signal;
-    document.getElementById("conf"+row).innerText = confidence + "%";
+    // 🔥 STRATEGY 2: BREAKOUT
+    let high = Math.max(...closes.slice(-10));
+    let low = Math.min(...closes.slice(-10));
 
+    if (last.close > high) {
+        signal = "BUY"; strength += 25;
+    }
+    if (last.close < low) {
+        signal = "SELL"; strength += 25;
+    }
+
+    // 🔥 STRATEGY 3: ENGULFING
+    if (last.close > last.open && prev.close < prev.open && last.close > prev.open) {
+        signal = "BUY"; strength += 20;
+    }
+    if (last.close < last.open && prev.close > prev.open && last.close < prev.open) {
+        signal = "SELL"; strength += 20;
+    }
+
+    // 🔥 STRATEGY 4: RSI EXTREME
+    if (lastRSI < 30) {
+        signal = "BUY"; strength += 25;
+    }
+    if (lastRSI > 70) {
+        signal = "SELL"; strength += 25;
+    }
+
+    if (strength < 25) signal = "WAIT";
+
+    // DISPLAY
+    document.getElementById("trend"+row).innerText = trend;
+
+    function setSignal(id, sig) {
+        let el = document.getElementById(id);
+        el.innerText = sig;
+        el.className = sig.toLowerCase();
+    }
+
+    setSignal("s1_"+row, signal);
+    setSignal("s2_"+row, strength >= 30 ? signal : "WAIT");
+    setSignal("s5_"+row, strength >= 50 ? signal : "WAIT");
+
+    document.getElementById("power"+row).innerHTML =
+        strength >= 70 ? "<strong>🔥 VERY STRONG</strong>" :
+        strength >= 50 ? "STRONG" :
+        strength >= 30 ? "MEDIUM" :
+        "WEAK";
+
+    // 🔔 ALERT ONLY GOOD SIGNALS
+    if (strength >= 50) {
+        document.getElementById("alertSound").play();
+    }
 }
 
-getSignal("EUR/USD", 1);
-getSignal("GBP/USD", 2);
-getSignal("USD/JPY", 3);
+// RUN
+function runAll() {
+    getSignal("EUR/USD", 1);
+    getSignal("GBP/USD", 2);
+    getSignal("USD/JPY", 3);
+}
+
+runAll();
+setInterval(runAll, 60000);
 
 </script>
 
