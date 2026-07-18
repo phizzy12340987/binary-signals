@@ -2,72 +2,46 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>3 Pair Elite Signals</title>
+<title>Signals PRO MAX</title>
 
 <style>
-body {
-    background:#020617;
-    color:white;
-    font-family:Arial;
-    text-align:center;
-}
+body { background:#020617; color:white; font-family:Arial; text-align:center; }
 
-h2 { margin:10px; }
+table { width:100%; border-collapse:collapse; }
 
-table {
-    width:100%;
-    border-collapse:collapse;
-    font-size:14px;
-}
-
-td, th {
-    border:1px solid #333;
-    padding:8px;
-}
+td, th { border:1px solid #333; padding:8px; }
 
 .buy { color:#00ff99; font-weight:bold; }
 .sell { color:#ff4d4d; font-weight:bold; }
 .wait { color:orange; }
 
-strong { color:gold; }
-
-.timer {
-    font-size:18px;
-    margin:10px;
-    color:#38bdf8;
-}
-
 .card {
-    background:#0f172a;
-    padding:10px;
-    margin:10px;
-    border-radius:10px;
+background:#0f172a;
+margin:10px;
+padding:10px;
+border-radius:10px;
 }
 
-button {
-    padding:5px 10px;
-    margin:2px;
-    border:none;
-    border-radius:5px;
-    cursor:pointer;
-}
+.timer { color:#38bdf8; }
 
-.win { background:green; color:white; }
-.loss { background:red; color:white; }
+.entry { color:gold; }
+
+strong { color:#22c55e; }
 </style>
 </head>
 
 <body>
 
-<h2>🔥 3 PAIR ELITE SYSTEM (LIVE)</h2>
+<h2>🚀 SIGNALS PRO MAX</h2>
 
 <div class="timer">
-Next update: <span id="countdown">60</span>s
+Refresh: <span id="refresh">60</span>s | Entry Timer: <span id="entryTimer">-</span>
 </div>
 
 <div class="card">
 Wins: <span id="wins">0</span> |
-Losses: <span id="losses">0</span>
+Losses: <span id="losses">0</span> |
+Win Rate: <span id="rate">0%</span>
 </div>
 
 <table>
@@ -76,181 +50,209 @@ Losses: <span id="losses">0</span>
 <th>Pair</th>
 <th>Trend</th>
 <th>Signal</th>
-<th>Strength</th>
+<th>Power</th>
+<th>Entry</th>
 <th>Result</th>
 </tr>
 </thead>
-<tbody id="tableBody"></tbody>
+<tbody id="body"></tbody>
 </table>
 
 <div class="card">
-<h3>📜 Signal History</h3>
+<h3>📜 History</h3>
 <div id="history"></div>
 </div>
 
-<audio id="alertSound" src="https://www.soundjay.com/buttons/sounds/button-3.mp3"></audio>
+<audio id="sound" src="https://www.soundjay.com/buttons/sounds/button-3.mp3"></audio>
 
 <script>
 
-const API_KEY = "a894c373fc5b44649cfb84c1634e0ca1";
+// 🔐 SIMPLE KEY HIDE
+const KEY_PART1 = "a894c373";
+const KEY_PART2 = "fc5b4464";
+const KEY_PART3 = "9cfb84c1";
+const KEY_PART4 = "634e0ca1";
+
+const API_KEY = KEY_PART1 + KEY_PART2 + KEY_PART3 + KEY_PART4;
 
 const pairs = ["EUR/USD","GBP/USD","USD/JPY"];
 
-let history = [];
-let wins = 0;
-let losses = 0;
+let wins=0, losses=0;
+let history=[];
 
-function createTable(){
-let body=document.getElementById("tableBody");
-body.innerHTML="";
+function updateRate(){
+let total = wins + losses;
+let rate = total ? ((wins/total)*100).toFixed(1) : 0;
+document.getElementById("rate").innerText = rate+"%";
+}
+
+function addWin(){ wins++; document.getElementById("wins").innerText=wins; updateRate(); }
+function addLoss(){ losses++; document.getElementById("losses").innerText=losses; updateRate(); }
+
+function create(){
+let b=document.getElementById("body");
+b.innerHTML="";
 pairs.forEach((p,i)=>{
-body.innerHTML+=`
+b.innerHTML+=`
 <tr>
 <td>${p}</td>
-<td id="trend${i}"></td>
-<td id="sig${i}"></td>
-<td id="pow${i}"></td>
+<td id="t${i}"></td>
+<td id="s${i}"></td>
+<td id="p${i}"></td>
+<td id="e${i}"></td>
 <td>
-<button class="win" onclick="addWin()">✔</button>
-<button class="loss" onclick="addLoss()">✖</button>
+<button onclick="addWin()">✔</button>
+<button onclick="addLoss()">✖</button>
 </td>
 </tr>`;
 });
 }
 
 function ema(p,d){
-let k=2/(p+1),arr=[d[0]];
-for(let i=1;i<d.length;i++){
-arr.push(d[i]*k+arr[i-1]*(1-k));
-}
-return arr;
+let k=2/(p+1),a=[d[0]];
+for(let i=1;i<d.length;i++) a.push(d[i]*k+a[i-1]*(1-k));
+return a;
 }
 
 function rsi(d,p=14){
 let g=0,l=0;
 for(let i=d.length-p;i<d.length;i++){
 let diff=d[i]-d[i-1];
-if(diff>0)g+=diff;else l-=diff;
+if(diff>0)g+=diff; else l-=diff;
 }
 let rs=g/(l||1);
 return 100-(100/(1+rs));
 }
 
-function addHistory(text){
-history.unshift(text);
-history = history.slice(0,10);
+function addHistory(txt){
+history.unshift(txt);
+history=history.slice(0,10);
 document.getElementById("history").innerHTML = history.join("<br>");
 }
 
-function addWin(){
-wins++;
-document.getElementById("wins").innerText=wins;
-}
-
-function addLoss(){
-losses++;
-document.getElementById("losses").innerText=losses;
-}
-
-async function getSignal(pair,row){
+async function getSignal(pair,i){
 
 try{
 
-let res = await fetch(`https://api.twelvedata.com/time_series?symbol=${pair}&interval=1min&outputsize=100&apikey=${API_KEY}`);
-let data = await res.json();
+let res = await fetch(`https://api.twelvedata.com/time_series?symbol=${pair}&interval=1min&outputsize=80&apikey=${API_KEY}`);
+let d = await res.json();
 
-if(!data.values){
-document.getElementById("trend"+row).innerText = data.message || "No Data";
+if(!d.values){
+document.getElementById("t"+i).innerText="No Data";
 return;
 }
 
-let v = data.values.reverse();
-let closes = v.map(x=>parseFloat(x.close));
+let v=d.values.reverse();
+let c=v.map(x=>+x.close);
 
-let ema50 = ema(50,closes);
-let ema200 = ema(200,closes);
-let lastRSI = rsi(closes);
+let ema50=ema(50,c);
+let ema200=ema(200,c);
+let rs=rsi(c);
 
-let trend = ema50.at(-1) > ema200.at(-1) ? "UP" : "DOWN";
+let trend = ema50.at(-1)>ema200.at(-1)?"UP":"DOWN";
 
-let last = v.at(-1);
-let prev = v.at(-2);
+let last=v.at(-1), prev=v.at(-2);
 
-let signal = "WAIT";
-let strength = 0;
+let signal="WAIT", power=0;
 
-if(lastRSI > 45 && lastRSI < 55){
-document.getElementById("trend"+row).innerText = "SIDEWAYS";
-document.getElementById("sig"+row).innerText = "WAIT";
-document.getElementById("pow"+row).innerText = "-";
+// NO TRADE ZONE
+if(rs>48 && rs<52){
+document.getElementById("t"+i).innerText="SIDE";
+document.getElementById("s"+i).innerText="WAIT";
+document.getElementById("p"+i).innerText="-";
+document.getElementById("e"+i).innerText="NO TRADE";
 return;
 }
 
-if(trend==="UP" && last.close>last.open){
-signal="BUY"; strength+=40;
-}
-if(trend==="DOWN" && last.close<last.open){
-signal="SELL"; strength+=40;
-}
+// TREND CONFIRM
+if(trend==="UP" && last.close>last.open){ signal="BUY"; power+=40; }
+if(trend==="DOWN" && last.close<last.open){ signal="SELL"; power+=40; }
 
-let high=Math.max(...closes.slice(-10));
-let low=Math.min(...closes.slice(-10));
+// BREAKOUT
+let high=Math.max(...c.slice(-8));
+let low=Math.min(...c.slice(-8));
+if(last.close>high){ signal="BUY"; power+=30; }
+if(last.close<low){ signal="SELL"; power+=30; }
 
-if(last.close>high){signal="BUY"; strength+=30;}
-if(last.close<low){signal="SELL"; strength+=30;}
+// PATTERN
+if(last.close>last.open && prev.close<prev.open) power+=20;
+if(last.close<last.open && prev.close>prev.open) power+=20;
 
-if(last.close>last.open && prev.close<prev.open){
-signal="BUY"; strength+=20;
-}
-if(last.close<last.open && prev.close>prev.open){
-signal="SELL"; strength+=20;
-}
+// FILTER
+if(power<60) signal="WAIT";
 
-if(strength < 50) signal="WAIT";
-
-document.getElementById("trend"+row).innerText = trend;
-
-let el=document.getElementById("sig"+row);
-el.innerText=signal;
-el.className=signal.toLowerCase();
-
-document.getElementById("pow"+row).innerHTML =
-strength>=70 ? "<strong>🔥 STRONG</strong>" :
-strength>=50 ? "GOOD" : "WEAK";
-
-if(signal !== "WAIT"){
-addHistory(pair + " → " + signal);
+// ENTRY
+let entry="WAIT";
+if(signal!=="WAIT"){
+if(power>=75) entry="5 MIN";
+else if(power>=65) entry="2 MIN";
+else entry="1 MIN";
 }
 
-if(strength>=70){
-document.getElementById("alertSound").play();
+document.getElementById("t"+i).innerText=trend;
+
+let s=document.getElementById("s"+i);
+s.innerText=signal;
+s.className=signal.toLowerCase();
+
+document.getElementById("p"+i).innerHTML =
+power>=75 ? "<strong>STRONG</strong>" :
+power>=65 ? "GOOD" : "WEAK";
+
+document.getElementById("e"+i).innerText=entry;
+
+if(signal!=="WAIT"){
+addHistory(pair+" → "+signal+" ("+entry+")");
 }
 
-}catch(e){
-document.getElementById("trend"+row).innerText="Error";
+// SOUND
+if(power>=75){
+document.getElementById("sound").play();
+startEntryTimer(entry);
+}
+
+}catch{
+document.getElementById("t"+i).innerText="Error";
 }
 
 }
 
-async function runAll(){
-for(let i=0;i<pairs.length;i++){
-    await getSignal(pairs[i], i);
-    await new Promise(r => setTimeout(r, 1200));
-}
-}
+// ENTRY TIMER
+function startEntryTimer(type){
+let sec = type==="5 MIN"?300:type==="2 MIN"?120:60;
 
-let sec=60;
-setInterval(()=>{
+let el=document.getElementById("entryTimer");
+
+let x=setInterval(()=>{
 sec--;
+el.innerText = sec+"s";
 if(sec<=0){
-sec=60;
-runAll();
+clearInterval(x);
+el.innerText="-";
 }
-document.getElementById("countdown").innerText=sec;
+},1000);
+}
+
+async function run(){
+for(let i=0;i<pairs.length;i++){
+await getSignal(pairs[i],i);
+await new Promise(r=>setTimeout(r,1200));
+}
+}
+
+// REFRESH TIMER
+let r=60;
+setInterval(()=>{
+r--;
+if(r<=0){
+r=60;
+run();
+}
+document.getElementById("refresh").innerText=r;
 },1000);
 
-createTable();
-runAll();
+create();
+run();
 
 </script>
 
