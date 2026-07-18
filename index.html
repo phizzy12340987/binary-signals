@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Binary Signals STABLE</title>
+<title>3 Pair Elite Signals</title>
 
 <style>
 body {
@@ -11,6 +11,7 @@ body {
     font-family:Arial;
     text-align:center;
 }
+
 h2 { margin:10px; }
 
 table {
@@ -40,17 +41,18 @@ strong { color:gold; }
 
 <body>
 
-<h2>📊 Binary Signals (Stable Version)</h2>
-<div class="timer">Next update: <span id="countdown">60</span>s</div>
+<h2>🔥 3 PAIR ELITE SYSTEM (STABLE)</h2>
+
+<div class="timer">
+Next update: <span id="countdown">60</span>s
+</div>
 
 <table>
 <thead>
 <tr>
 <th>Pair</th>
 <th>Trend</th>
-<th>1m</th>
-<th>2m</th>
-<th>5m</th>
+<th>Signal</th>
 <th>Strength</th>
 </tr>
 </thead>
@@ -61,35 +63,26 @@ strong { color:gold; }
 
 <script>
 
-const API_KEY = "1ce295bfaf354ce18bdf8d6059237cf9";
+const API_KEY = "PUT_YOUR_API_KEY_HERE";
 
-// ✅ ONLY WORKING PAIRS
+// ✅ ONLY 3 BEST PAIRS (NO ERRORS)
 const pairs = [
 "EUR/USD",
 "GBP/USD",
-"USD/JPY",
-"AUD/USD",
-"USD/CAD",
-"USD/CHF",
-"NZD/USD",
-"XAU/USD",   // Gold
-"BTC/USD",   // Crypto
-"ETH/USD"    // Crypto
+"USD/JPY"
 ];
 
 // CREATE TABLE
 function createTable(){
-let body = document.getElementById("tableBody");
+let body=document.getElementById("tableBody");
 body.innerHTML="";
 pairs.forEach((p,i)=>{
 body.innerHTML+=`
 <tr>
 <td>${p}</td>
 <td id="trend${i}"></td>
-<td id="s1_${i}"></td>
-<td id="s2_${i}"></td>
-<td id="s5_${i}"></td>
-<td id="power${i}"></td>
+<td id="sig${i}"></td>
+<td id="pow${i}"></td>
 </tr>`;
 });
 }
@@ -114,97 +107,94 @@ let rs=g/(l||1);
 return 100-(100/(1+rs));
 }
 
-// MAIN FUNCTION
+// SIGNAL FUNCTION
 async function getSignal(pair,row){
-
 try{
 
-let res=await fetch(`https://api.twelvedata.com/time_series?symbol=${pair}&interval=1min&outputsize=100&apikey=${API_KEY}`);
-let data=await res.json();
+let res = await fetch(`https://api.twelvedata.com/time_series?symbol=${pair}&interval=1min&outputsize=100&apikey=${API_KEY}`);
+let data = await res.json();
 
-// ✅ SAFETY CHECK
-if (!data.values || data.status === "error") {
-document.getElementById("trend"+row).innerText="No Data";
+// ERROR HANDLING
+if(!data.values){
+document.getElementById("trend"+row).innerText = data.message || "No Data";
 return;
 }
 
-let v=data.values.reverse();
-let closes=v.map(x=>parseFloat(x.close));
+let v = data.values.reverse();
+let closes = v.map(x=>parseFloat(x.close));
 
-let ema50=ema(50,closes);
-let ema200=ema(200,closes);
-let lastRSI=rsi(closes);
+let ema50 = ema(50,closes);
+let ema200 = ema(200,closes);
+let lastRSI = rsi(closes);
 
-let trend=ema50.at(-1)>ema200.at(-1)?"UP":"DOWN";
+let trend = ema50.at(-1) > ema200.at(-1) ? "UP" : "DOWN";
 
-let last=v.at(-1);
-let prev=v.at(-2);
+let last = v.at(-1);
+let prev = v.at(-2);
 
-let signal="WAIT";
-let strength=0;
+let signal = "WAIT";
+let strength = 0;
 
-// 🔥 STRATEGY 1
-if(trend==="UP" && lastRSI<45 && last.close>last.open){
-signal="BUY"; strength+=30;
+// 🔥 DO NOT TRADE FILTER
+if(lastRSI > 45 && lastRSI < 55){
+signal = "WAIT";
+document.getElementById("trend"+row).innerText = "SIDEWAYS";
+return;
 }
-if(trend==="DOWN" && lastRSI>55 && last.close<last.open){
-signal="SELL"; strength+=30;
+
+// TREND + CANDLE
+if(trend==="UP" && last.close>last.open){
+signal="BUY"; strength+=40;
+}
+if(trend==="DOWN" && last.close<last.open){
+signal="SELL"; strength+=40;
 }
 
-// 🔥 STRATEGY 2 (Breakout)
+// BREAKOUT
 let high=Math.max(...closes.slice(-10));
 let low=Math.min(...closes.slice(-10));
 
-if(last.close>high){signal="BUY"; strength+=25;}
-if(last.close<low){signal="SELL"; strength+=25;}
+if(last.close>high){signal="BUY"; strength+=30;}
+if(last.close<low){signal="SELL"; strength+=30;}
 
-// 🔥 STRATEGY 3 (Engulfing)
-if(last.close>last.open && prev.close<prev.open && last.close>prev.open){
+// ENGULFING
+if(last.close>last.open && prev.close<prev.open){
 signal="BUY"; strength+=20;
 }
-if(last.close<last.open && prev.close>prev.open && last.close<prev.open){
+if(last.close<last.open && prev.close>prev.open){
 signal="SELL"; strength+=20;
 }
 
-// 🔥 STRATEGY 4 (RSI)
-if(lastRSI<30){signal="BUY"; strength+=25;}
-if(lastRSI>70){signal="SELL"; strength+=25;}
-
-// 🚫 FILTER LOW SIGNALS
-if(strength < 25) signal="WAIT";
+// FILTER WEAK SIGNALS
+if(strength < 50) signal="WAIT";
 
 // DISPLAY
-document.getElementById("trend"+row).innerText=trend;
+document.getElementById("trend"+row).innerText = trend;
 
-function setSig(id,s){
-let el=document.getElementById(id);
-el.innerText=s;
-el.className=s.toLowerCase();
-}
+let el=document.getElementById("sig"+row);
+el.innerText=signal;
+el.className=signal.toLowerCase();
 
-setSig("s1_"+row,signal);
-setSig("s2_"+row,strength>=30?signal:"WAIT");
-setSig("s5_"+row,strength>=50?signal:"WAIT");
+document.getElementById("pow"+row).innerHTML =
+strength>=70 ? "<strong>🔥 STRONG</strong>" :
+strength>=50 ? "GOOD" : "WEAK";
 
-document.getElementById("power"+row).innerHTML=
-strength>=70?"<strong>🔥 VERY STRONG</strong>":
-strength>=50?"STRONG":
-strength>=30?"MEDIUM":"WEAK";
-
-// 🔔 ALERT
-if(strength>=50){
+// ALERT
+if(strength>=70){
 document.getElementById("alertSound").play();
 }
 
 }catch(e){
 document.getElementById("trend"+row).innerText="Error";
 }
-
 }
 
-// RUN ALL
-function runAll(){
-pairs.forEach((p,i)=>getSignal(p,i));
+// RUN WITH DELAY (VERY IMPORTANT)
+async function runAll(){
+for(let i=0;i<pairs.length;i++){
+    await getSignal(pairs[i], i);
+    await new Promise(r => setTimeout(r, 1200)); // prevents API limit
+}
 }
 
 // TIMER
