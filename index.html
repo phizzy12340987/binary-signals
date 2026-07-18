@@ -2,12 +2,12 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Signals PRO MAX</title>
+<title>ULTIMATE SIGNALS AI</title>
 
 <style>
 body { background:#020617; color:white; font-family:Arial; text-align:center; }
 
-table { width:100%; border-collapse:collapse; }
+table { width:100%; border-collapse:collapse; font-size:14px; }
 
 td, th { border:1px solid #333; padding:8px; }
 
@@ -22,26 +22,23 @@ padding:10px;
 border-radius:10px;
 }
 
-.timer { color:#38bdf8; }
+.best { color:#22c55e; font-size:18px; font-weight:bold; }
 
-.entry { color:gold; }
+.bad { color:red; font-weight:bold; }
 
-strong { color:#22c55e; }
 </style>
 </head>
 
 <body>
 
-<h2>🚀 SIGNALS PRO MAX</h2>
+<h2>🧠 ULTIMATE SIGNALS AI</h2>
 
-<div class="timer">
-Refresh: <span id="refresh">60</span>s | Entry Timer: <span id="entryTimer">-</span>
+<div class="card best">
+Best Trade Now: <span id="best">Scanning...</span>
 </div>
 
 <div class="card">
-Wins: <span id="wins">0</span> |
-Losses: <span id="losses">0</span> |
-Win Rate: <span id="rate">0%</span>
+Market: <span id="session"></span>
 </div>
 
 <table>
@@ -50,44 +47,28 @@ Win Rate: <span id="rate">0%</span>
 <th>Pair</th>
 <th>Trend</th>
 <th>Signal</th>
-<th>Power</th>
-<th>Entry</th>
-<th>Result</th>
+<th>Confidence</th>
+<th>Time</th>
 </tr>
 </thead>
 <tbody id="body"></tbody>
 </table>
 
-<div class="card">
-<h3>📜 History</h3>
-<div id="history"></div>
-</div>
-
-<audio id="sound" src="https://www.soundjay.com/buttons/sounds/button-3.mp3"></audio>
-
 <script>
 
-// 🔐 SIMPLE KEY HIDE
-const KEY_PART1 = "a894c373";
-const KEY_PART2 = "fc5b4464";
-const KEY_PART3 = "9cfb84c1";
-const KEY_PART4 = "634e0ca1";
-
-const API_KEY = KEY_PART1 + KEY_PART2 + KEY_PART3 + KEY_PART4;
+// 🔐 Hidden API key
+const API_KEY = "a894c373"+"fc5b4464"+"9cfb84c1"+"634e0ca1";
 
 const pairs = ["EUR/USD","GBP/USD","USD/JPY"];
 
-let wins=0, losses=0;
-let history=[];
-
-function updateRate(){
-let total = wins + losses;
-let rate = total ? ((wins/total)*100).toFixed(1) : 0;
-document.getElementById("rate").innerText = rate+"%";
+function getSession(){
+let h = new Date().getUTCHours();
+if(h>=7 && h<=16) return "LONDON";
+if(h>=12 && h<=21) return "NEW YORK";
+return "OFF MARKET";
 }
 
-function addWin(){ wins++; document.getElementById("wins").innerText=wins; updateRate(); }
-function addLoss(){ losses++; document.getElementById("losses").innerText=losses; updateRate(); }
+document.getElementById("session").innerText = getSession();
 
 function create(){
 let b=document.getElementById("body");
@@ -98,12 +79,8 @@ b.innerHTML+=`
 <td>${p}</td>
 <td id="t${i}"></td>
 <td id="s${i}"></td>
-<td id="p${i}"></td>
+<td id="c${i}"></td>
 <td id="e${i}"></td>
-<td>
-<button onclick="addWin()">✔</button>
-<button onclick="addLoss()">✖</button>
-</td>
 </tr>`;
 });
 }
@@ -124,13 +101,7 @@ let rs=g/(l||1);
 return 100-(100/(1+rs));
 }
 
-function addHistory(txt){
-history.unshift(txt);
-history=history.slice(0,10);
-document.getElementById("history").innerHTML = history.join("<br>");
-}
-
-async function getSignal(pair,i){
+async function analyze(pair,i){
 
 try{
 
@@ -139,7 +110,7 @@ let d = await res.json();
 
 if(!d.values){
 document.getElementById("t"+i).innerText="No Data";
-return;
+return {pair,score:0};
 }
 
 let v=d.values.reverse();
@@ -153,106 +124,84 @@ let trend = ema50.at(-1)>ema200.at(-1)?"UP":"DOWN";
 
 let last=v.at(-1), prev=v.at(-2);
 
-let signal="WAIT", power=0;
+let score=0, signal="WAIT";
 
-// NO TRADE ZONE
+// RSI filter
 if(rs>48 && rs<52){
-document.getElementById("t"+i).innerText="SIDE";
-document.getElementById("s"+i).innerText="WAIT";
-document.getElementById("p"+i).innerText="-";
-document.getElementById("e"+i).innerText="NO TRADE";
-return;
+document.getElementById("s"+i).innerHTML="<span class='bad'>NO TRADE</span>";
+return {pair,score:0};
 }
 
-// TREND CONFIRM
-if(trend==="UP" && last.close>last.open){ signal="BUY"; power+=40; }
-if(trend==="DOWN" && last.close<last.open){ signal="SELL"; power+=40; }
+// Trend
+if(trend==="UP" && last.close>last.open){ signal="BUY"; score+=40; }
+if(trend==="DOWN" && last.close<last.open){ signal="SELL"; score+=40; }
 
-// BREAKOUT
+// Breakout
 let high=Math.max(...c.slice(-8));
 let low=Math.min(...c.slice(-8));
-if(last.close>high){ signal="BUY"; power+=30; }
-if(last.close<low){ signal="SELL"; power+=30; }
+if(last.close>high){ score+=30; }
+if(last.close<low){ score+=30; }
 
-// PATTERN
-if(last.close>last.open && prev.close<prev.open) power+=20;
-if(last.close<last.open && prev.close>prev.open) power+=20;
+// Pattern
+if(last.close>last.open && prev.close<prev.open) score+=20;
+if(last.close<last.open && prev.close>prev.open) score+=20;
 
-// FILTER
-if(power<60) signal="WAIT";
+// Session boost
+let session = getSession();
+if(session!=="OFF MARKET") score+=10;
 
-// ENTRY
-let entry="WAIT";
-if(signal!=="WAIT"){
-if(power>=75) entry="5 MIN";
-else if(power>=65) entry="2 MIN";
-else entry="1 MIN";
-}
+// Final filter
+if(score<60) signal="WAIT";
 
+// Entry time
+let entry="-";
+if(score>=80) entry="5m";
+else if(score>=70) entry="2m";
+else if(score>=60) entry="1m";
+
+// UI
 document.getElementById("t"+i).innerText=trend;
 
 let s=document.getElementById("s"+i);
 s.innerText=signal;
 s.className=signal.toLowerCase();
 
-document.getElementById("p"+i).innerHTML =
-power>=75 ? "<strong>STRONG</strong>" :
-power>=65 ? "GOOD" : "WEAK";
-
+document.getElementById("c"+i).innerText=score+"%";
 document.getElementById("e"+i).innerText=entry;
 
-if(signal!=="WAIT"){
-addHistory(pair+" → "+signal+" ("+entry+")");
-}
-
-// SOUND
-if(power>=75){
-document.getElementById("sound").play();
-startEntryTimer(entry);
-}
+return {pair,score,signal,entry};
 
 }catch{
-document.getElementById("t"+i).innerText="Error";
+return {pair,score:0};
 }
 
-}
-
-// ENTRY TIMER
-function startEntryTimer(type){
-let sec = type==="5 MIN"?300:type==="2 MIN"?120:60;
-
-let el=document.getElementById("entryTimer");
-
-let x=setInterval(()=>{
-sec--;
-el.innerText = sec+"s";
-if(sec<=0){
-clearInterval(x);
-el.innerText="-";
-}
-},1000);
 }
 
 async function run(){
+
+let results=[];
+
 for(let i=0;i<pairs.length;i++){
-await getSignal(pairs[i],i);
-await new Promise(r=>setTimeout(r,1200));
-}
+let r = await analyze(pairs[i],i);
+results.push(r);
+await new Promise(r=>setTimeout(r,1000));
 }
 
-// REFRESH TIMER
-let r=60;
-setInterval(()=>{
-r--;
-if(r<=0){
-r=60;
-run();
+// BEST PAIR
+let best = results.sort((a,b)=>b.score-a.score)[0];
+
+if(best.score>=70 && best.signal!=="WAIT"){
+document.getElementById("best").innerText =
+best.pair+" → "+best.signal+" ("+best.entry+") "+best.score+"%";
+}else{
+document.getElementById("best").innerText="NO GOOD TRADE";
 }
-document.getElementById("refresh").innerText=r;
-},1000);
+
+}
 
 create();
 run();
+setInterval(run,60000);
 
 </script>
 
