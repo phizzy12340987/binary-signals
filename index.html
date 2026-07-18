@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PRO Binary Signals</title>
+<title>ELITE Signals</title>
 
 <style>
 body {
@@ -11,6 +11,7 @@ body {
     font-family:Arial;
     text-align:center;
 }
+
 h2 { margin:10px; }
 
 table {
@@ -35,13 +36,40 @@ strong { color:gold; }
     margin:10px;
     color:#38bdf8;
 }
+
+.card {
+    background:#0f172a;
+    padding:10px;
+    margin:10px;
+    border-radius:10px;
+}
+
+button {
+    padding:5px 10px;
+    margin:3px;
+    border:none;
+    border-radius:5px;
+    cursor:pointer;
+}
+
+.win { background:green; color:white; }
+.loss { background:red; color:white; }
+
 </style>
 </head>
 
 <body>
 
-<h2>📊 PRO Signals (5 Pairs Only)</h2>
-<div class="timer">Next update: <span id="countdown">60</span>s</div>
+<h2>🔥 ELITE SIGNAL SYSTEM</h2>
+
+<div class="timer">
+Next candle: <span id="countdown">60</span>s
+</div>
+
+<div class="card">
+Wins: <span id="wins">0</span> |
+Loss: <span id="losses">0</span>
+</div>
 
 <table>
 <thead>
@@ -49,28 +77,32 @@ strong { color:gold; }
 <th>Pair</th>
 <th>Trend</th>
 <th>Signal</th>
-<th>Strength</th>
+<th>Power</th>
+<th>Result</th>
 </tr>
 </thead>
 <tbody id="tableBody"></tbody>
 </table>
 
+<div class="card">
+<h3>📜 Signal History</h3>
+<div id="history"></div>
+</div>
+
 <audio id="alertSound" src="https://www.soundjay.com/buttons/sounds/button-3.mp3"></audio>
 
 <script>
 
-const API_KEY = "YOUR_API_KEY_HERE";
+const API_KEY = "YOUR_API_KEY";
 
-// ✅ ONLY BEST 5 PAIRS
-const pairs = [
-"EUR/USD",
-"GBP/USD",
-"USD/JPY",
-"XAU/USD",
-"BTC/USD"
-];
+// 🔥 BEST 5 PAIRS
+const pairs = ["EUR/USD","GBP/USD","USD/JPY","XAU/USD","BTC/USD"];
 
-// CREATE TABLE
+let history = [];
+let wins = 0;
+let losses = 0;
+
+// TABLE
 function createTable(){
 let body=document.getElementById("tableBody");
 body.innerHTML="";
@@ -81,6 +113,10 @@ body.innerHTML+=`
 <td id="trend${i}"></td>
 <td id="sig${i}"></td>
 <td id="pow${i}"></td>
+<td>
+<button class="win" onclick="addWin()">✔</button>
+<button class="loss" onclick="addLoss()">✖</button>
+</td>
 </tr>`;
 });
 }
@@ -105,8 +141,27 @@ let rs=g/(l||1);
 return 100-(100/(1+rs));
 }
 
+// HISTORY
+function addHistory(text){
+history.unshift(text);
+history = history.slice(0,10);
+document.getElementById("history").innerHTML = history.join("<br>");
+}
+
+// TRACKER
+function addWin(){
+wins++;
+document.getElementById("wins").innerText=wins;
+}
+
+function addLoss(){
+losses++;
+document.getElementById("losses").innerText=losses;
+}
+
 // SIGNAL
 async function getSignal(pair,row){
+
 try{
 
 let res=await fetch(`https://api.twelvedata.com/time_series?symbol=${pair}&interval=1min&outputsize=100&apikey=${API_KEY}`);
@@ -132,11 +187,18 @@ let prev=v.at(-2);
 let signal="WAIT";
 let strength=0;
 
-// TREND + RSI
-if(trend==="UP" && lastRSI<45 && last.close>last.open){
+// 🔥 DO NOT TRADE ZONE
+if(lastRSI>45 && lastRSI<55){
+signal="WAIT";
+document.getElementById("trend"+row).innerText="SIDEWAYS";
+return;
+}
+
+// TREND + CANDLE
+if(trend==="UP" && last.close>last.open){
 signal="BUY"; strength+=40;
 }
-if(trend==="DOWN" && lastRSI>55 && last.close<last.open){
+if(trend==="DOWN" && last.close<last.open){
 signal="SELL"; strength+=40;
 }
 
@@ -148,15 +210,15 @@ if(last.close>high){signal="BUY"; strength+=30;}
 if(last.close<low){signal="SELL"; strength+=30;}
 
 // ENGULFING
-if(last.close>last.open && prev.close<prev.open && last.close>prev.open){
+if(last.close>last.open && prev.close<prev.open){
 signal="BUY"; strength+=20;
 }
-if(last.close<last.open && prev.close>prev.open && last.close<prev.open){
+if(last.close<last.open && prev.close>prev.open){
 signal="SELL"; strength+=20;
 }
 
 // FILTER
-if(strength<40) signal="WAIT";
+if(strength<50) signal="WAIT";
 
 // DISPLAY
 document.getElementById("trend"+row).innerText=trend;
@@ -167,9 +229,13 @@ el.className=signal.toLowerCase();
 
 document.getElementById("pow"+row).innerHTML=
 strength>=70?"<strong>🔥 STRONG</strong>":
-strength>=40?"GOOD":"WEAK";
+strength>=50?"GOOD":"WEAK";
 
-// ALERT
+// HISTORY + ALERT
+if(signal!=="WAIT"){
+addHistory(pair+" → "+signal);
+}
+
 if(strength>=70){
 document.getElementById("alertSound").play();
 }
@@ -177,6 +243,7 @@ document.getElementById("alertSound").play();
 }catch(e){
 document.getElementById("trend"+row).innerText="Error";
 }
+
 }
 
 // RUN
