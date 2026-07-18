@@ -1,65 +1,8 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Binary Signal Pro</title>
-
-<style>
-body{
-background:#0f172a;
-color:white;
-font-family:Arial;
-text-align:center;
-}
-
-table{
-width:100%;
-margin-top:20px;
-border-collapse:collapse;
-}
-
-td,th{
-padding:10px;
-border-bottom:1px solid #1e293b;
-}
-
-.buy{color:#22c55e;}
-.sell{color:#ef4444;}
-.wait{color:#94a3b8;}
-
-#best{
-margin-top:20px;
-font-size:18px;
-font-weight:bold;
-}
-</style>
-</head>
-
-<body>
-
-<h2>📊 Binary Signal</h2>
-<div id="session"></div>
-
-<table>
-<thead>
-<tr>
-<th>Pair</th>
-<th>Trend</th>
-<th>Signal</th>
-<th>Confidence</th>
-<th>Time</th>
-</tr>
-</thead>
-<tbody id="body"></tbody>
-</table>
-
-<div id="best">Loading...</div>
-
 <script>
 
 const API_KEY = "e920431466e147f98d79a0e84683a990";
 
-// ✅ ONLY BEST 3 PAIRS (STABLE)
+// BEST PAIRS
 const pairs = ["EURUSD","GBPUSD","USDJPY"];
 
 // SESSION
@@ -110,8 +53,14 @@ async function analyze(pair,i){
 
 try{
 
-let url = `https://api.twelvedata.com/time_series?symbol=${pair}&interval=1min&outputsize=100&apikey=${API_KEY}`;
+let session = getSession();
+if(session === "Low Volume"){
+document.getElementById("s"+i).innerText="NO TRADE";
+return {pair,score:0};
+}
 
+// 1m DATA
+let url = `https://api.twelvedata.com/time_series?symbol=${pair}&interval=1min&outputsize=100&apikey=${API_KEY}`;
 let res = await fetch(url);
 let d = await res.json();
 
@@ -123,46 +72,73 @@ return {pair,score:0};
 let v = d.values.reverse();
 let closes = v.map(x=>+x.close);
 
+// 5m HTF DATA
+let urlHTF = `https://api.twelvedata.com/time_series?symbol=${pair}&interval=5min&outputsize=50&apikey=${API_KEY}`;
+let resHTF = await fetch(urlHTF);
+let dHTF = await resHTF.json();
+
+let trendHTF = "NONE";
+if(dHTF.values){
+let v2 = dHTF.values.reverse();
+let closesHTF = v2.map(x=>+x.close);
+let ema50HTF = ema(50,closesHTF);
+let ema200HTF = ema(200,closesHTF);
+trendHTF = ema50HTF.at(-1)>ema200HTF.at(-1)?"UP":"DOWN";
+}
+
+// INDICATORS
 let ema50 = ema(50,closes);
 let ema200 = ema(200,closes);
 let rs = rsi(closes);
 
 let trend = ema50.at(-1)>ema200.at(-1)?"UP":"DOWN";
 
-let last=v.at(-1);
-let prev=v.at(-2);
+// SUPPORT & RESISTANCE
+let support = Math.min(...closes.slice(-20));
+let resistance = Math.max(...closes.slice(-20));
+let price = closes.at(-1);
 
+let nearSupport = price <= support * 1.002;
+let nearResistance = price >= resistance * 0.998;
+
+// RSI CROSS LOGIC
+let prevRS = rsi(closes.slice(0,-1));
+let buyRSI = prevRS < 45 && rs > 45;
+let sellRSI = prevRS > 55 && rs < 55;
+
+// SCORE
 let score = 0;
 
-// TREND
-if(trend==="UP") score+=20;
-if(trend==="DOWN") score+=20;
+// TREND + HTF CONFIRM
+if(trend==="UP" && trendHTF==="UP") score+=30;
+if(trend==="DOWN" && trendHTF==="DOWN") score+=30;
+
+// S/R
+if(nearSupport && trend==="UP") score+=25;
+if(nearResistance && trend==="DOWN") score+=25;
 
 // RSI
-if(rs>55 || rs<45) score+=15;
+if(buyRSI && trend==="UP") score+=20;
+if(sellRSI && trend==="DOWN") score+=20;
 
 // STRONG CANDLE
+let last=v.at(-1);
 let body=Math.abs(last.close-last.open);
 let range=last.high-last.low;
-if(body/range>0.5) score+=20;
-
-// BREAKOUT
-let high=Math.max(...closes.slice(-10));
-let low=Math.min(...closes.slice(-10));
-
-if(last.close>high) score+=25;
-if(last.close<low) score+=25;
+if(body/range>0.6) score+=15;
 
 // SIGNAL
 let signal="WAIT";
-if(trend==="UP" && score>=60) signal="BUY";
-if(trend==="DOWN" && score>=60) signal="SELL";
+
+if(score>=75){
+if(trend==="UP" && nearSupport && buyRSI) signal="BUY";
+if(trend==="DOWN" && nearResistance && sellRSI) signal="SELL";
+}
 
 // ENTRY TIME
 let entry="-";
 if(score>=85) entry="5m";
-else if(score>=70) entry="2m";
-else if(score>=60) entry="1m";
+else if(score>=75) entry="2m";
 
 // UI
 document.getElementById("t"+i).innerText=trend;
@@ -191,15 +167,13 @@ let results=[];
 for(let i=0;i<pairs.length;i++){
 let r = await analyze(pairs[i],i);
 results.push(r);
-
-// ⏱ prevent API limit
 await new Promise(r=>setTimeout(r,1500));
 }
 
 // BEST SIGNAL
 let best = results.sort((a,b)=>b.score-a.score)[0];
 
-if(best.score>=70 && best.signal!=="WAIT"){
+if(best.score>=75 && best.signal!=="WAIT"){
 document.getElementById("best").innerText =
 best.pair+" → "+best.signal+" ("+best.entry+") "+best.score+"%";
 }else{
@@ -214,6 +188,3 @@ run();
 setInterval(run,60000);
 
 </script>
-
-</body>
-</html>
