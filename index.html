@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Binary Signals ULTIMATE</title>
+<title>Binary Signals STABLE</title>
 
 <style>
 body {
@@ -11,18 +11,17 @@ body {
     font-family:Arial;
     text-align:center;
 }
-
-h2 { margin:5px; }
+h2 { margin:10px; }
 
 table {
     width:100%;
     border-collapse:collapse;
-    font-size:13px;
+    font-size:14px;
 }
 
 td, th {
     border:1px solid #333;
-    padding:6px;
+    padding:8px;
 }
 
 .buy { color:#00ff99; font-weight:bold; }
@@ -31,16 +30,9 @@ td, th {
 
 strong { color:gold; }
 
-.card {
-    background:#0f172a;
-    margin:8px;
-    padding:8px;
-    border-radius:10px;
-}
-
 .timer {
     font-size:18px;
-    margin:5px;
+    margin:10px;
     color:#38bdf8;
 }
 </style>
@@ -48,10 +40,9 @@ strong { color:gold; }
 
 <body>
 
-<h2>🚀 Binary Signals ULTIMATE</h2>
-<div class="timer">Next candle in: <span id="countdown">60</span>s</div>
+<h2>📊 Binary Signals (Stable Version)</h2>
+<div class="timer">Next update: <span id="countdown">60</span>s</div>
 
-<div class="card">
 <table>
 <thead>
 <tr>
@@ -61,40 +52,36 @@ strong { color:gold; }
 <th>2m</th>
 <th>5m</th>
 <th>Strength</th>
-<th>Result</th>
 </tr>
 </thead>
 <tbody id="tableBody"></tbody>
 </table>
-</div>
-
-<div class="card">
-<h3>📜 Signal History</h3>
-<div id="history"></div>
-</div>
 
 <audio id="alertSound" src="https://www.soundjay.com/buttons/sounds/button-3.mp3"></audio>
 
 <script>
 
-const API_KEY = "YOUR_API_KEY";
+const API_KEY = "1ce295bfaf354ce18bdf8d6059237cf9";
 
-// PAIRS
+// ✅ ONLY WORKING PAIRS
 const pairs = [
-"EUR/USD","GBP/USD","USD/JPY",
-"AUD/USD","USD/CAD","EUR/GBP",
-"EUR/JPY","GBP/JPY","AUD/JPY","USD/CHF"
+"EUR/USD",
+"GBP/USD",
+"USD/JPY",
+"AUD/USD",
+"USD/CAD",
+"USD/CHF",
+"NZD/USD",
+"XAU/USD",   // Gold
+"BTC/USD",   // Crypto
+"ETH/USD"    // Crypto
 ];
 
-let historyLog = {};
-let stats = {win:0, loss:0};
-
-// INIT TABLE
+// CREATE TABLE
 function createTable(){
 let body = document.getElementById("tableBody");
-body.innerHTML = "";
+body.innerHTML="";
 pairs.forEach((p,i)=>{
-historyLog[p]=[];
 body.innerHTML+=`
 <tr>
 <td>${p}</td>
@@ -103,7 +90,6 @@ body.innerHTML+=`
 <td id="s2_${i}"></td>
 <td id="s5_${i}"></td>
 <td id="power${i}"></td>
-<td id="result${i}">-</td>
 </tr>`;
 });
 }
@@ -128,13 +114,19 @@ let rs=g/(l||1);
 return 100-(100/(1+rs));
 }
 
-// MAIN SIGNAL
+// MAIN FUNCTION
 async function getSignal(pair,row){
+
+try{
 
 let res=await fetch(`https://api.twelvedata.com/time_series?symbol=${pair}&interval=1min&outputsize=100&apikey=${API_KEY}`);
 let data=await res.json();
 
-if(!data.values) return;
+// ✅ SAFETY CHECK
+if (!data.values || data.status === "error") {
+document.getElementById("trend"+row).innerText="No Data";
+return;
+}
 
 let v=data.values.reverse();
 let closes=v.map(x=>parseFloat(x.close));
@@ -145,29 +137,41 @@ let lastRSI=rsi(closes);
 
 let trend=ema50.at(-1)>ema200.at(-1)?"UP":"DOWN";
 
-let last=v.at(-1),prev=v.at(-2);
+let last=v.at(-1);
+let prev=v.at(-2);
 
-let signal="WAIT",strength=0;
+let signal="WAIT";
+let strength=0;
 
-// MULTI STRATEGY
-if(trend==="UP"&&lastRSI<45&&last.close>last.open){signal="BUY";strength+=30;}
-if(trend==="DOWN"&&lastRSI>55&&last.close<last.open){signal="SELL";strength+=30;}
+// 🔥 STRATEGY 1
+if(trend==="UP" && lastRSI<45 && last.close>last.open){
+signal="BUY"; strength+=30;
+}
+if(trend==="DOWN" && lastRSI>55 && last.close<last.open){
+signal="SELL"; strength+=30;
+}
 
+// 🔥 STRATEGY 2 (Breakout)
 let high=Math.max(...closes.slice(-10));
 let low=Math.min(...closes.slice(-10));
 
-if(last.close>high){signal="BUY";strength+=25;}
-if(last.close<low){signal="SELL";strength+=25;}
+if(last.close>high){signal="BUY"; strength+=25;}
+if(last.close<low){signal="SELL"; strength+=25;}
 
-if(last.close>last.open&&prev.close<prev.open&&last.close>prev.open){signal="BUY";strength+=20;}
-if(last.close<last.open&&prev.close>prev.open&&last.close<prev.open){signal="SELL";strength+=20;}
+// 🔥 STRATEGY 3 (Engulfing)
+if(last.close>last.open && prev.close<prev.open && last.close>prev.open){
+signal="BUY"; strength+=20;
+}
+if(last.close<last.open && prev.close>prev.open && last.close<prev.open){
+signal="SELL"; strength+=20;
+}
 
-if(lastRSI<30){signal="BUY";strength+=25;}
-if(lastRSI>70){signal="SELL";strength+=25;}
+// 🔥 STRATEGY 4 (RSI)
+if(lastRSI<30){signal="BUY"; strength+=25;}
+if(lastRSI>70){signal="SELL"; strength+=25;}
 
-// 🚫 DO NOT TRADE FILTER
-let volatility=Math.abs(high-low);
-if(volatility<0.0005){signal="WAIT";}
+// 🚫 FILTER LOW SIGNALS
+if(strength < 25) signal="WAIT";
 
 // DISPLAY
 document.getElementById("trend"+row).innerText=trend;
@@ -192,38 +196,13 @@ if(strength>=50){
 document.getElementById("alertSound").play();
 }
 
-// 📜 SAVE HISTORY
-if(signal!=="WAIT"){
-historyLog[pair].unshift(signal+" ("+strength+")");
-if(historyLog[pair].length>10) historyLog[pair].pop();
+}catch(e){
+document.getElementById("trend"+row).innerText="Error";
 }
-
-// 📊 SIMULATED RESULT
-let result="-";
-if(prev){
-if(signal==="BUY" && last.close>prev.close){result="WIN";stats.win++;}
-else if(signal==="SELL" && last.close<prev.close){result="WIN";stats.win++;}
-else if(signal!=="WAIT"){result="LOSS";stats.loss++;}
-}
-
-document.getElementById("result"+row).innerText=result;
-
-// UPDATE HISTORY UI
-updateHistory();
 
 }
 
-// HISTORY DISPLAY
-function updateHistory(){
-let html="";
-for(let p in historyLog){
-html+=`<b>${p}</b>: ${historyLog[p].join(", ")}<br>`;
-}
-html+=`<br>Wins: ${stats.win} | Losses: ${stats.loss}`;
-document.getElementById("history").innerHTML=html;
-}
-
-// RUN
+// RUN ALL
 function runAll(){
 pairs.forEach((p,i)=>getSignal(p,i));
 }
@@ -232,10 +211,14 @@ pairs.forEach((p,i)=>getSignal(p,i));
 let sec=60;
 setInterval(()=>{
 sec--;
-if(sec<=0){sec=60;runAll();}
+if(sec<=0){
+sec=60;
+runAll();
+}
 document.getElementById("countdown").innerText=sec;
 },1000);
 
+// START
 createTable();
 runAll();
 
