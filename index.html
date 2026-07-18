@@ -1,73 +1,136 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Binary Signal Dashboard</title>
-    <style>
-        body {
-            background: #0f172a;
-            color: white;
-            font-family: Arial;
-            text-align: center;
-        }
-        table {
-            margin: auto;
-            border-collapse: collapse;
-            width: 80%;
-        }
-        th, td {
-            padding: 15px;
-            border: 1px solid #333;
-        }
-        th {
-            background: #1e293b;
-        }
-        .buy { color: lime; }
-        .sell { color: red; }
-        .wait { color: orange; }
-    </style>
+<title>Binary Signals</title>
+
+<style>
+body {
+    background: #0f172a;
+    color: white;
+    font-family: Arial;
+    text-align: center;
+}
+table {
+    margin: auto;
+    width: 80%;
+    border-collapse: collapse;
+}
+td, th {
+    padding: 15px;
+    border: 1px solid #333;
+}
+.buy { color: lime; }
+.sell { color: red; }
+.wait { color: orange; }
+</style>
+
 </head>
 <body>
 
-<h1>📊 Binary Signals Dashboard</h1>
+<h1>📊 Binary Signal Dashboard</h1>
 
 <table>
 <tr>
-    <th>Pair</th>
-    <th>Trend</th>
-    <th>Signal</th>
-    <th>1 Min</th>
-    <th>2 Min</th>
-    <th>5 Min</th>
+<th>Pair</th>
+<th>Trend</th>
+<th>Signal</th>
+<th>Confidence</th>
 </tr>
 
 <tr>
-    <td>EUR/USD</td>
-    <td>UP</td>
-    <td class="buy">BUY</td>
-    <td>✔️</td>
-    <td>✔️</td>
-    <td>❌</td>
+<td>EUR/USD</td>
+<td id="trend1">...</td>
+<td id="signal1">...</td>
+<td id="conf1">...</td>
 </tr>
 
 <tr>
-    <td>GBP/USD</td>
-    <td>DOWN</td>
-    <td class="sell">SELL</td>
-    <td>✔️</td>
-    <td>❌</td>
-    <td>✔️</td>
+<td>GBP/USD</td>
+<td id="trend2">...</td>
+<td id="signal2">...</td>
+<td id="conf2">...</td>
 </tr>
 
 <tr>
-    <td>USD/JPY</td>
-    <td>SIDE</td>
-    <td class="wait">WAIT</td>
-    <td>❌</td>
-    <td>❌</td>
-    <td>❌</td>
+<td>USD/JPY</td>
+<td id="trend3">...</td>
+<td id="signal3">...</td>
+<td id="conf3">...</td>
 </tr>
 
 </table>
+
+<script>
+
+const API_KEY = "1ce295bfaf354ce18bdf8d6059237cf9";
+
+async function getSignal(pair, row) {
+
+    let url = `https://api.twelvedata.com/time_series?symbol=${pair}&interval=1min&outputsize=100&apikey=${API_KEY}`;
+    let res = await fetch(url);
+    let data = await res.json();
+
+    let values = data.values.reverse();
+
+    let closes = values.map(v => parseFloat(v.close));
+
+    // EMA
+    function ema(period, data) {
+        let k = 2 / (period + 1);
+        let emaArray = [data[0]];
+        for (let i = 1; i < data.length; i++) {
+            emaArray.push(data[i] * k + emaArray[i-1] * (1 - k));
+        }
+        return emaArray;
+    }
+
+    let ema50 = ema(50, closes);
+    let ema200 = ema(200, closes);
+
+    // RSI
+    function rsi(data, period = 14) {
+        let gains = [], losses = [];
+        for (let i = 1; i < data.length; i++) {
+            let diff = data[i] - data[i-1];
+            gains.push(diff > 0 ? diff : 0);
+            losses.push(diff < 0 ? -diff : 0);
+        }
+        let avgGain = gains.slice(-period).reduce((a,b)=>a+b)/period;
+        let avgLoss = losses.slice(-period).reduce((a,b)=>a+b)/period;
+        let rs = avgGain / avgLoss;
+        return 100 - (100 / (1 + rs));
+    }
+
+    let last = values[values.length - 1];
+    let lastRSI = rsi(closes);
+
+    let trend = ema50.at(-1) > ema200.at(-1) ? "UP" : "DOWN";
+
+    let bullish = parseFloat(last.close) > parseFloat(last.open);
+    let bearish = parseFloat(last.close) < parseFloat(last.open);
+
+    let signal = "WAIT";
+    let confidence = 40;
+
+    if (trend === "UP" && lastRSI < 40 && bullish) {
+        signal = "BUY";
+        confidence = 70;
+    } else if (trend === "DOWN" && lastRSI > 60 && bearish) {
+        signal = "SELL";
+        confidence = 70;
+    }
+
+    document.getElementById("trend"+row).innerText = trend;
+    document.getElementById("signal"+row).innerText = signal;
+    document.getElementById("conf"+row).innerText = confidence + "%";
+
+}
+
+getSignal("EUR/USD", 1);
+getSignal("GBP/USD", 2);
+getSignal("USD/JPY", 3);
+
+</script>
 
 </body>
 </html>
