@@ -1,31 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Binary Signal Pro</title>
+
+<style>
+body{
+background:#0f172a;
+color:white;
+font-family:Arial;
+text-align:center;
+}
+
+table{
+width:100%;
+margin-top:20px;
+border-collapse:collapse;
+}
+
+td,th{
+padding:10px;
+border-bottom:1px solid #1e293b;
+}
+
+.buy{color:#22c55e;}
+.sell{color:#ef4444;}
+.wait{color:#94a3b8;}
+
+#best{
+margin-top:20px;
+font-size:18px;
+font-weight:bold;
+}
+</style>
+</head>
+
+<body>
+
+<h2>📊 Binary Signal</h2>
+<div id="session"></div>
+
+<table>
+<thead>
+<tr>
+<th>Pair</th>
+<th>Trend</th>
+<th>Signal</th>
+<th>Confidence</th>
+<th>Time</th>
+</tr>
+</thead>
+<tbody id="body"></tbody>
+</table>
+
+<div id="best">Loading...</div>
+
 <script>
 
-// 🔐 API
-const API_KEY = "a894c373"+"fc5b4464"+"9cfb84c1"+"634e0ca1";
+const API_KEY = "e920431466e147f98d79a0e84683a990";
 
-const pairs = ["EUR/USD","GBP/USD","USD/JPY"];
+// ✅ ONLY BEST 3 PAIRS (STABLE)
+const pairs = ["EURUSD","GBPUSD","USDJPY"];
 
-// 🧠 MARKET OPEN CHECK
-function isMarketOpen(){
-let now = new Date();
-let day = now.getUTCDay(); // 0=Sun
-let hour = now.getUTCHours();
-
-if(day === 6) return false; // Saturday closed
-if(day === 0 && hour < 21) return false; // Sunday before open
-if(day === 5 && hour >= 21) return false; // Friday after close
-
-return true;
-}
-
-// 🕒 SESSION
+// SESSION
 function getSession(){
-let h = new Date().getUTCHours();
-if(h>=7 && h<=16) return "LONDON";
-if(h>=12 && h<=21) return "NEW YORK";
-return "ASIA / LOW VOLUME";
+let h=new Date().getUTCHours();
+if(h>=7 && h<=16) return "London Session";
+if(h>=12 && h<=21) return "New York Session";
+return "Low Volume";
 }
-
 document.getElementById("session").innerText = getSession();
 
 // UI
@@ -36,122 +79,90 @@ pairs.forEach((p,i)=>{
 b.innerHTML+=`
 <tr>
 <td>${p}</td>
-<td id="t${i}"></td>
-<td id="s${i}"></td>
-<td id="c${i}"></td>
-<td id="e${i}"></td>
+<td id="t${i}">-</td>
+<td id="s${i}">-</td>
+<td id="c${i}">-</td>
+<td id="e${i}">-</td>
 </tr>`;
 });
 }
 
-// INDICATORS
+// EMA
 function ema(p,d){
 let k=2/(p+1),a=[d[0]];
 for(let i=1;i<d.length;i++) a.push(d[i]*k+a[i-1]*(1-k));
 return a;
 }
 
+// RSI
 function rsi(d,p=14){
 let g=0,l=0;
 for(let i=d.length-p;i<d.length;i++){
 let diff=d[i]-d[i-1];
-if(diff>0)g+=diff; else l-=diff;
+if(diff>0) g+=diff; else l-=diff;
 }
 let rs=g/(l||1);
 return 100-(100/(1+rs));
 }
 
-// 🧠 AI LOGIC (SMART SCORING)
-function aiScore({trend,last,prev,closes,rs}){
-
-let score = 0;
-
-// Trend strength
-if(trend==="UP") score += 15;
-if(trend==="DOWN") score += 15;
-
-// Candle strength
-let body = Math.abs(last.close - last.open);
-let range = last.high - last.low;
-
-if(body/range > 0.6) score += 15;
-
-// RSI zones
-if(rs > 55 && rs < 70) score += 15;
-if(rs < 45 && rs > 30) score += 15;
-
-// Breakout
-let high = Math.max(...closes.slice(-10));
-let low = Math.min(...closes.slice(-10));
-
-if(last.close > high) score += 20;
-if(last.close < low) score += 20;
-
-// Engulfing
-if(last.close>last.open && prev.close<prev.open) score += 15;
-if(last.close<last.open && prev.close>prev.open) score += 15;
-
-// Avoid weak candles
-if(body < range*0.3) score -= 20;
-
-return score;
-}
-
-// MAIN
+// ANALYZE
 async function analyze(pair,i){
-
-if(!isMarketOpen()){
-document.getElementById("s"+i).innerHTML="<span class='bad'>MARKET CLOSED</span>";
-return {pair,score:0};
-}
 
 try{
 
-let res = await fetch(`https://api.twelvedata.com/time_series?symbol=${pair}&interval=1min&outputsize=100&apikey=${API_KEY}`);
+let url = `https://api.twelvedata.com/time_series?symbol=${pair}&interval=1min&outputsize=100&apikey=${API_KEY}`;
+
+let res = await fetch(url);
 let d = await res.json();
 
 if(!d.values){
-document.getElementById("t"+i).innerText="No Data";
+document.getElementById("s"+i).innerText="No Data";
 return {pair,score:0};
 }
 
-let v=d.values.reverse();
-let c=v.map(x=>+x.close);
+let v = d.values.reverse();
+let closes = v.map(x=>+x.close);
 
-let ema50=ema(50,c);
-let ema200=ema(200,c);
-let rs=rsi(c);
+let ema50 = ema(50,closes);
+let ema200 = ema(200,closes);
+let rs = rsi(closes);
 
 let trend = ema50.at(-1)>ema200.at(-1)?"UP":"DOWN";
 
-let last=v.at(-1), prev=v.at(-2);
+let last=v.at(-1);
+let prev=v.at(-2);
 
-// ❌ NO TRADE ZONE
-if(rs>48 && rs<52){
-document.getElementById("s"+i).innerHTML="<span class='bad'>NO TRADE</span>";
-return {pair,score:0};
-}
+let score = 0;
 
-// 🧠 AI SCORE
-let score = aiScore({trend,last,prev,closes:c,rs});
+// TREND
+if(trend==="UP") score+=20;
+if(trend==="DOWN") score+=20;
+
+// RSI
+if(rs>55 || rs<45) score+=15;
+
+// STRONG CANDLE
+let body=Math.abs(last.close-last.open);
+let range=last.high-last.low;
+if(body/range>0.5) score+=20;
+
+// BREAKOUT
+let high=Math.max(...closes.slice(-10));
+let low=Math.min(...closes.slice(-10));
+
+if(last.close>high) score+=25;
+if(last.close<low) score+=25;
 
 // SIGNAL
 let signal="WAIT";
-if(trend==="UP" && score>60) signal="BUY";
-if(trend==="DOWN" && score>60) signal="SELL";
+if(trend==="UP" && score>=60) signal="BUY";
+if(trend==="DOWN" && score>=60) signal="SELL";
 
-// ENTRY
+// ENTRY TIME
 let entry="-";
 if(score>=85) entry="5m";
 else if(score>=70) entry="2m";
 else if(score>=60) entry="1m";
-
-// SESSION FILTER
-let session = getSession();
-if(session==="ASIA / LOW VOLUME") score -= 10;
-
-// FINAL BLOCK
-if(score < 60) signal="WAIT";
 
 // UI
 document.getElementById("t"+i).innerText=trend;
@@ -160,12 +171,13 @@ let s=document.getElementById("s"+i);
 s.innerText=signal;
 s.className=signal.toLowerCase();
 
-document.getElementById("c"+i).innerText=Math.max(score,0)+"%";
+document.getElementById("c"+i).innerText=score+"%";
 document.getElementById("e"+i).innerText=entry;
 
 return {pair,score,signal,entry};
 
 }catch{
+document.getElementById("s"+i).innerText="Error";
 return {pair,score:0};
 }
 
@@ -174,33 +186,34 @@ return {pair,score:0};
 // RUN
 async function run(){
 
-if(!isMarketOpen()){
-document.getElementById("best").innerText="MARKET CLOSED";
-return;
-}
-
 let results=[];
 
 for(let i=0;i<pairs.length;i++){
 let r = await analyze(pairs[i],i);
 results.push(r);
-await new Promise(r=>setTimeout(r,1000));
+
+// ⏱ prevent API limit
+await new Promise(r=>setTimeout(r,1500));
 }
 
-// BEST
+// BEST SIGNAL
 let best = results.sort((a,b)=>b.score-a.score)[0];
 
 if(best.score>=70 && best.signal!=="WAIT"){
 document.getElementById("best").innerText =
 best.pair+" → "+best.signal+" ("+best.entry+") "+best.score+"%";
 }else{
-document.getElementById("best").innerText="NO GOOD TRADE";
+document.getElementById("best").innerText="NO TRADE";
 }
 
 }
 
+// START
 create();
 run();
 setInterval(run,60000);
 
 </script>
+
+</body>
+</html>
