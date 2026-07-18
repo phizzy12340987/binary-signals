@@ -36,15 +36,38 @@ strong { color:gold; }
     margin:10px;
     color:#38bdf8;
 }
+
+.card {
+    background:#0f172a;
+    padding:10px;
+    margin:10px;
+    border-radius:10px;
+}
+
+button {
+    padding:5px 10px;
+    margin:2px;
+    border:none;
+    border-radius:5px;
+    cursor:pointer;
+}
+
+.win { background:green; color:white; }
+.loss { background:red; color:white; }
 </style>
 </head>
 
 <body>
 
-<h2>🔥 3 PAIR ELITE SYSTEM (STABLE)</h2>
+<h2>🔥 3 PAIR ELITE SYSTEM (LIVE)</h2>
 
 <div class="timer">
 Next update: <span id="countdown">60</span>s
+</div>
+
+<div class="card">
+Wins: <span id="wins">0</span> |
+Losses: <span id="losses">0</span>
 </div>
 
 <table>
@@ -54,25 +77,29 @@ Next update: <span id="countdown">60</span>s
 <th>Trend</th>
 <th>Signal</th>
 <th>Strength</th>
+<th>Result</th>
 </tr>
 </thead>
 <tbody id="tableBody"></tbody>
 </table>
 
+<div class="card">
+<h3>📜 Signal History</h3>
+<div id="history"></div>
+</div>
+
 <audio id="alertSound" src="https://www.soundjay.com/buttons/sounds/button-3.mp3"></audio>
 
 <script>
 
-const API_KEY = "PUT_YOUR_API_KEY_HERE";
+const API_KEY = "a894c373fc5b44649cfb84c1634e0ca1";
 
-// ✅ ONLY 3 BEST PAIRS (NO ERRORS)
-const pairs = [
-"EUR/USD",
-"GBP/USD",
-"USD/JPY"
-];
+const pairs = ["EUR/USD","GBP/USD","USD/JPY"];
 
-// CREATE TABLE
+let history = [];
+let wins = 0;
+let losses = 0;
+
 function createTable(){
 let body=document.getElementById("tableBody");
 body.innerHTML="";
@@ -83,11 +110,14 @@ body.innerHTML+=`
 <td id="trend${i}"></td>
 <td id="sig${i}"></td>
 <td id="pow${i}"></td>
+<td>
+<button class="win" onclick="addWin()">✔</button>
+<button class="loss" onclick="addLoss()">✖</button>
+</td>
 </tr>`;
 });
 }
 
-// EMA
 function ema(p,d){
 let k=2/(p+1),arr=[d[0]];
 for(let i=1;i<d.length;i++){
@@ -96,7 +126,6 @@ arr.push(d[i]*k+arr[i-1]*(1-k));
 return arr;
 }
 
-// RSI
 function rsi(d,p=14){
 let g=0,l=0;
 for(let i=d.length-p;i<d.length;i++){
@@ -107,14 +136,29 @@ let rs=g/(l||1);
 return 100-(100/(1+rs));
 }
 
-// SIGNAL FUNCTION
+function addHistory(text){
+history.unshift(text);
+history = history.slice(0,10);
+document.getElementById("history").innerHTML = history.join("<br>");
+}
+
+function addWin(){
+wins++;
+document.getElementById("wins").innerText=wins;
+}
+
+function addLoss(){
+losses++;
+document.getElementById("losses").innerText=losses;
+}
+
 async function getSignal(pair,row){
+
 try{
 
 let res = await fetch(`https://api.twelvedata.com/time_series?symbol=${pair}&interval=1min&outputsize=100&apikey=${API_KEY}`);
 let data = await res.json();
 
-// ERROR HANDLING
 if(!data.values){
 document.getElementById("trend"+row).innerText = data.message || "No Data";
 return;
@@ -135,14 +179,13 @@ let prev = v.at(-2);
 let signal = "WAIT";
 let strength = 0;
 
-// 🔥 DO NOT TRADE FILTER
 if(lastRSI > 45 && lastRSI < 55){
-signal = "WAIT";
 document.getElementById("trend"+row).innerText = "SIDEWAYS";
+document.getElementById("sig"+row).innerText = "WAIT";
+document.getElementById("pow"+row).innerText = "-";
 return;
 }
 
-// TREND + CANDLE
 if(trend==="UP" && last.close>last.open){
 signal="BUY"; strength+=40;
 }
@@ -150,14 +193,12 @@ if(trend==="DOWN" && last.close<last.open){
 signal="SELL"; strength+=40;
 }
 
-// BREAKOUT
 let high=Math.max(...closes.slice(-10));
 let low=Math.min(...closes.slice(-10));
 
 if(last.close>high){signal="BUY"; strength+=30;}
 if(last.close<low){signal="SELL"; strength+=30;}
 
-// ENGULFING
 if(last.close>last.open && prev.close<prev.open){
 signal="BUY"; strength+=20;
 }
@@ -165,10 +206,8 @@ if(last.close<last.open && prev.close>prev.open){
 signal="SELL"; strength+=20;
 }
 
-// FILTER WEAK SIGNALS
 if(strength < 50) signal="WAIT";
 
-// DISPLAY
 document.getElementById("trend"+row).innerText = trend;
 
 let el=document.getElementById("sig"+row);
@@ -179,7 +218,10 @@ document.getElementById("pow"+row).innerHTML =
 strength>=70 ? "<strong>🔥 STRONG</strong>" :
 strength>=50 ? "GOOD" : "WEAK";
 
-// ALERT
+if(signal !== "WAIT"){
+addHistory(pair + " → " + signal);
+}
+
 if(strength>=70){
 document.getElementById("alertSound").play();
 }
@@ -187,17 +229,16 @@ document.getElementById("alertSound").play();
 }catch(e){
 document.getElementById("trend"+row).innerText="Error";
 }
+
 }
 
-// RUN WITH DELAY (VERY IMPORTANT)
 async function runAll(){
 for(let i=0;i<pairs.length;i++){
     await getSignal(pairs[i], i);
-    await new Promise(r => setTimeout(r, 1200)); // prevents API limit
+    await new Promise(r => setTimeout(r, 1200));
 }
 }
 
-// TIMER
 let sec=60;
 setInterval(()=>{
 sec--;
@@ -208,7 +249,6 @@ runAll();
 document.getElementById("countdown").innerText=sec;
 },1000);
 
-// START
 createTable();
 runAll();
 
