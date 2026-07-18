@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Binary Signal Dashboard</title>
+    <style>
+        body {
+            background: #0f172a;
+            color: white;
+            font-family: Arial;
+            text-align: center;
+        }
+        table {
+            margin: auto;
+            border-collapse: collapse;
+            width: 80%;
+        }
+        th, td {
+            padding: 15px;
+            border: 1px solid #333;
+        }
+        th {
+            background: #1e293b;
+        }
+        .buy { color: lime; }
+        .sell { color: red; }
+        .wait { color: orange; }
+    </style>
+</head>
+<body>
+
+<h1>📊 Binary Signals Dashboard</h1>
+
+<table>
+<tr>
+    <th>Pair</th>
+    <th>Trend</th>
+    <th>Signal</th>
+    <th>1 Min</th>
+    <th>2 Min</th>
+    <th>5 Min</th>
+</tr>
+
+<tr>
+    <td>EUR/USD</td>
+    <td>UP</td>
+    <td class="buy">BUY</td>
+    <td>✔️</td>
+    <td>✔️</td>
+    <td>❌</td>
+</tr>
+
+<tr>
+    <td>GBP/USD</td>
+    <td>DOWN</td>
+    <td class="sell">SELL</td>
+    <td>✔️</td>
+    <td>❌</td>
+    <td>✔️</td>
+</tr>
+
+<tr>
+    <td>USD/JPY</td>
+    <td>SIDE</td>
+    <td class="wait">WAIT</td>
+    <td>❌</td>
+    <td>❌</td>
+    <td>❌</td>
+</tr>
+
+</table>
+
+</body>
+</html>
